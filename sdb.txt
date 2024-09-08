@@ -1,0 +1,27 @@
+Importação de dados por arquivo CSV:
+
+LOAD DATA INFILE 'C:/usuarios/joaoP/Downloads/Produtos.csv'
+INTO TABLE produtos
+FIELDS TERMINATED BY ',' ENCLOSED BY '"' LINES TERMINATED BY '\n'
+(codigo, nome, preco, quantidade);
+
+
+inserir os dados do TXT no banco de dados:
+
+LOAD DATA INFILE 'C:/usuarios/joaoP/Downloads/pedidos.txt'
+INTO TABLE tempdata
+FIELDS TERMINATED BY ';' ENCLOSED BY '"' LINES TERMINATED BY '\n'
+(codigoPedido, dataPedido, SKU, UPC, nomeProduto, qtd, valor, frete, email, codigoComprador, nomeComprador, endereco, cep, uf, pais);
+
+
+selecionar clientes sem repetição:
+
+SELECT DISTINCT codigoComprador, email, endereco, cep, uf, pais FROM tempdata GROUP BY codigoComprador;
+
+
+inserir clientes sem repetição, com base nos dados que estavam na tabela tempdata:
+
+INSERT INTO `clientes` (nomeComprador, email, codigoComprador, endereco, cep, uf, pais) SELECT DISTINCT nomeComprador, email, codigoComprador, endereco, CEP, UF, pais FROM tempdata GROUP BY codigoComprador;
+
+
+
