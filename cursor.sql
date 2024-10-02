@@ -1,10 +1,19 @@
+-- Desabilitar modo que auto-incrementa colunas sem valor definido
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+
+-- Iniciar uma transação
 START TRANSACTION;
+
+-- Definir o fuso horário para UTC
 SET time_zone = "+00:00";
 
+-- Definir o delimitador para separar comandos SQL
 DELIMITER $$
 
-CREATE DEFINER=`root`@`localhost` PROCEDURE `processa_entrega` ()   BEGIN
+-- Criar um procedimento armazenado chamado 'processa_entrega'
+CREATE DEFINER=`root`@`localhost` PROCEDURE `processa_entrega` ()   
+    BEGIN
+    -- Declarar variáveis para uso dentro do procedimento
     DECLARE done INT DEFAULT FALSE;
     DECLARE v_id_pedido INT;
     DECLARE v_id_produto INT;
@@ -12,7 +21,8 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `processa_entrega` ()   BEGIN
     DECLARE v_preco_unitario DECIMAL(10,2);
     DECLARE v_total_item DECIMAL(10,2);
     DECLARE v_estoque_atual INT;
-  
+
+ -- Definir um cursor para iterar sobre os pedidos, com itens e preços correspondentes
     DECLARE cursor_pedidos CURSOR FOR
         SELECT ip.pedido_id, ip.produto_id, ip.quantidade, p.preco_unitario, 
                (ip.quantidade * p.preco_unitario) AS total_item
@@ -23,63 +33,63 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `processa_entrega` ()   BEGIN
     -- Manipular caso o cursor chegue ao fim
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
+    -- Abrir cursor
     OPEN cursor_pedidos;
 
-    -- Começar o loop pelo cursor
+    -- começar o Loop para processar os itens do pedido
     read_loop: LOOP
+        -- Buscar os dados do próximo registro no cursor
         FETCH cursor_pedidos INTO v_id_pedido, v_id_produto, v_quantidade, v_preco_unitario, v_total_item;
-        
+
+        -- Sair do loop quando todos os registros tiverem sido processados
         IF done THEN
             LEAVE read_loop;
         END IF;
 
-        -- Checar o estoque atual do produto
+       -- Verificar a quantidade atual do produto em estoque
         SELECT quantidade INTO v_estoque_atual FROM estoque WHERE produto_id = v_id_produto;
         
-        -- Se o estoque for suficiente
+        - -- Se o estoque for suficiente para atender o pedido
         IF v_estoque_atual >= v_quantidade THEN
             -- Atualiza a tabela entrega com o total do pedido
             INSERT INTO entregas (pedido_id, produto_id, quantidade, total_item)
             VALUES (v_id_pedido, v_id_produto, v_quantidade, v_total_item);
             
-            -- Debitar a quantidade do estoque
+            -- Atualizar a quantidade no estoque subtraindo a quantidade vendida
             UPDATE estoque
             SET quantidade = quantidade - v_quantidade
             WHERE produto_id = v_id_produto;
 
         ELSE
-            -- Quando o estoque acabar, insira na tabela de compra
+            -- Se o estoque não for suficiente, registrar a necessidade de compra
             INSERT INTO compras (produto_id, quantidade_necessaria)
             VALUES (v_id_produto, v_quantidade - v_estoque_atual);
             
-            -- Atualiza o estoque para zero
+            -- Atualizar o estoque para 0, já que está esgotado
             UPDATE estoque
             SET quantidade = 0
             WHERE produto_id = v_id_produto;
         END IF;
     END LOOP;
 
+    -- Fechar o cursor após o loop terminar
     CLOSE cursor_pedidos;
 END$$
-
+-- Restaurar o delimitador padrão
 DELIMITER ;
 
 -- --------------------------------------------------------
 
---
 -- Estrutura para tabela `cliente`
---
 
+--Criar tabela de cliente
 CREATE TABLE `cliente` (
   `codigoComprador` varchar(32) NOT NULL,
   `email` varchar(100) NOT NULL,
   `nomeComprador` varchar(100) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Despejando dados para a tabela `cliente`
---
-
+-- Inserir dados na tabela cliente
 INSERT INTO `cliente` (`codigoComprador`, `email`, `nomeComprador`) VALUES
 ('123', 'samir@gmail.com', 'Samir'),
 ('456', 'jose@gmail.com', 'Jose'),
@@ -106,13 +116,14 @@ INSERT INTO `cliente` (`codigoComprador`, `email`, `nomeComprador`) VALUES
 ('479', 'andreia@gmail.com', 'Andreia'),
 ('480', 'jose2@gmail.com', 'Jose'),
 
-
+-- Criar tabela de compras
 CREATE TABLE `compras` (
   `codigoPedido` varchar(32) NOT NULL,
   `valor` float NOT NULL,
   `frete` float NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Inserir dados na tabela de entregas
 INSERT INTO `compras` (`codigoPedido`, `valor`, `frete`) VALUES
 ('abc124', 299, 12),
 ('abc125', 699, 15),
@@ -139,7 +150,7 @@ INSERT INTO `compras` (`codigoPedido`, `valor`, `frete`) VALUES
 ('abc146', 99, 10),
 ('abc147', 129, 12),
 
-
+-- criar tabela de entregas
 CREATE TABLE `entregas` (
   `codigoPedido` varchar(32) NOT NULL,
   `endereco` varchar(255) NOT NULL,
@@ -148,10 +159,7 @@ CREATE TABLE `entregas` (
   `pais` varchar(20) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Despejando dados para a tabela `entregas`
---
-
+-- Inserir dados na tabela de entregass
 INSERT INTO `entregas` (`codigoPedido`, `endereco`, `CEP`, `UF`, `pais`) VALUES
 ('abc124', 'Avenida Principal 10', '12345678', 'SP', 'Brasil\r'),
 ('abc125', 'Avenida Secundária 20', '23456789', 'SP', 'Brasil\r'),
@@ -179,13 +187,13 @@ INSERT INTO `entregas` (`codigoPedido`, `endereco`, `CEP`, `UF`, `pais`) VALUES
 ('abc147', 'Rua do Lago 230', '45678901', 'RJ', 'Brasil\r'),
 ('abc148', 'Rua das Laranjeiras 240', '56789012', 'RJ', 'Brasil\r'),
     
-
+-- Criar tabela de estoque
 CREATE TABLE `estoque` (
   `SKU` varchar(20) NOT NULL,
   `quantidade` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-
+-- Inserir dados na tabela de estoque
 INSERT INTO `estoque` (`SKU`, `quantidade`) VALUES
 ('brinq123sp', 3),
 ('brinq321rj', 1),
@@ -209,14 +217,14 @@ INSERT INTO `estoque` (`SKU`, `quantidade`) VALUES
 ('eletr789rj', 1),
 ('eletr987rj', 1),
     
-
+-- Criar a tabela de itens de pedidos
 CREATE TABLE `itens_pedido` (
   `codigoPedido` varchar(20) NOT NULL,
   `SKU` varchar(20) NOT NULL,
   `quantidade` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-
+-- Inserir dados na tabela de itens de pedidos
 INSERT INTO `itens_pedido` (`codigoPedido`, `SKU`, `quantidade`) VALUES
 ('abc124', 'eletr123', 1),
 ('abc125', 'eletr456', 1),
@@ -239,16 +247,14 @@ INSERT INTO `itens_pedido` (`codigoPedido`, `SKU`, `quantidade`) VALUES
 ('abc142', 'eletr987rj', 1),
 ('abc143', 'eletr654rj', 1),
 
-
-
+-- Criar a tabela de pedidos
 CREATE TABLE `pedidos` (
   `codigoPedido` varchar(32) NOT NULL,
   `dataPedido` date NOT NULL,
   `codigoComprador` varchar(32) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-
-
+-- Inserir dados na tabela de pedidos
 INSERT INTO `pedidos` (`codigoPedido`, `dataPedido`, `codigoComprador`) VALUES
 ('abc124', '2024-03-22', '456'),
 ('abc125', '2024-03-22', '457'),
@@ -269,7 +275,7 @@ INSERT INTO `pedidos` (`codigoPedido`, `dataPedido`, `codigoComprador`) VALUES
 ('abc140', '2024-03-27', '472'),
 ('abc141', '2024-03-27', '473'),
 
-
+-- Criar a tabela de produtos
 CREATE TABLE `produtos` (
   `SKU` varchar(20) NOT NULL,
   `UPC` varchar(20) NOT NULL,
@@ -278,7 +284,7 @@ CREATE TABLE `produtos` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 
-
+-- Inserir dados na tabela de produtos
 INSERT INTO `produtos` (`SKU`, `UPC`, `nomeProduto`, `valor`) VALUES
 ('brinq123sp', '77746', 'bola', 12),
 ('brinq321rj', '105609', 'skate', 99),
@@ -299,7 +305,7 @@ INSERT INTO `produtos` (`SKU`, `UPC`, `nomeProduto`, `valor`) VALUES
 ('eletr654rj', '121622', 'videogame', 499),
 ('eletr654sp', '654', 'fones', 89),
 
-    
+-- Criar uma tabela temporária para armazenar os dados dos pedidos
 CREATE TABLE `tempdata` (
   `codigoPedido` varchar(30) NOT NULL,
   `dataPedido` date NOT NULL,
@@ -318,8 +324,7 @@ CREATE TABLE `tempdata` (
   `pais` varchar(15) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--
-
+-- Inserir dados na tabela temporária
 INSERT INTO `tempdata` (`codigoPedido`, `dataPedido`, `SKU`, `UPC`, `nomeProduto`, `qtd`, `valor`, `frete`, `email`, `codigoComprador`, `nomeComprador`, `endereco`, `CEP`, `UF`, `pais`) VALUES
 ('abc124', '2024-03-22', 'eletr123', '103621', 'telefone', 1, 299, 12, 'jose@gmail.com', '456', 'Jose', 'Avenida Principal 10', '12345678', 'SP', 'Brasil\r'),
 ('abc125', '2024-03-22', 'eletr456', '50534', 'tablet', 1, 699, 15, 'marcia@gmail.com', '457', 'Marcia', 'Avenida Secundária 20', '23456789', 'SP', 'Brasil\r'),
@@ -339,55 +344,47 @@ INSERT INTO `tempdata` (`codigoPedido`, `dataPedido`, `SKU`, `UPC`, `nomeProduto
 ('abc139', '2024-03-27', 'roupa321sp', '65488', 'meia', 5, 25, 5, 'natasha@gmail.com', '471', 'Natasha', 'Avenida das Rosas 150', '67890123', 'RJ', 'Brasil\r'),
 ('abc140', '2024-03-27', 'roupa654sp', '150021', 'suéter', 1, 99, 7, 'andre@gmail.com', '472', 'Andre', 'Avenida das Margaridas 160', '78901234', 'RJ', 'Brasil\r'),
 
+-- Adição de chaves primárias nas tabelas
+ALTER TABLE `pedidos`
+  ADD PRIMARY KEY (`codigoPedido`),
+  ADD KEY `FK_PedidosCliente` (`codigoComprador`);
 
 ALTER TABLE `cliente`
   ADD PRIMARY KEY (`codigoComprador`),
   ADD UNIQUE KEY `email` (`email`);
 
+ALTER TABLE `produtos`
+  ADD PRIMARY KEY (`SKU`),
+  ADD UNIQUE KEY `UPC` (`UPC`);
 
 ALTER TABLE `compras`
-  ADD PRIMARY KEY (`codigoPedido`);
-
-
-ALTER TABLE `entregas`
   ADD PRIMARY KEY (`codigoPedido`);
 
 ALTER TABLE `estoque`
   ADD PRIMARY KEY (`SKU`);
 
+ALTER TABLE `entregas`
+  ADD PRIMARY KEY (`codigoPedido`);
 
 ALTER TABLE `itens_pedido`
   ADD KEY `FK_ItensPedido` (`codigoPedido`),
   ADD KEY `FK_ItensSKU` (`SKU`);
 
-
-ALTER TABLE `pedidos`
-  ADD PRIMARY KEY (`codigoPedido`),
-  ADD KEY `FK_PedidosCliente` (`codigoComprador`);
-
-ALTER TABLE `produtos`
-  ADD PRIMARY KEY (`SKU`),
-  ADD UNIQUE KEY `UPC` (`UPC`);
-
-
 ALTER TABLE `tempdata`
   ADD PRIMARY KEY (`codigoPedido`);
 
+-- Adição de chaves estrangeiras nas tabelas
+ALTER TABLE `entregas`
+  ADD CONSTRAINT `FK_EntregasPedido` FOREIGN KEY (`codigoPedido`) REFERENCES `pedidos` (`codigoPedido`);
 
 ALTER TABLE `compras`
   ADD CONSTRAINT `FK_ComprasPedido` FOREIGN KEY (`codigoPedido`) REFERENCES `pedidos` (`codigoPedido`);
 
-
-ALTER TABLE `entregas`
-  ADD CONSTRAINT `FK_EntregasPedido` FOREIGN KEY (`codigoPedido`) REFERENCES `pedidos` (`codigoPedido`);
-
-
-ALTER TABLE `estoque`
-  ADD CONSTRAINT `FK_EstoqueProduto` FOREIGN KEY (`SKU`) REFERENCES `produtos` (`SKU`);
-
-
 ALTER TABLE `itens_pedido`
   ADD CONSTRAINT `FK_ItensPedido` FOREIGN KEY (`codigoPedido`) REFERENCES `pedidos` (`codigoPedido`),
   ADD CONSTRAINT `FK_ItensSKU` FOREIGN KEY (`SKU`) REFERENCES `produtos` (`SKU`);
+
+ALTER TABLE `estoque`
+  ADD CONSTRAINT `FK_EstoqueProduto` FOREIGN KEY (`SKU`) REFERENCES `produtos` (`SKU`);
 COMMIT;
 
