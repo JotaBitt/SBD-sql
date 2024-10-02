@@ -49,7 +49,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `processa_entrega` ()
        -- Verificar a quantidade atual do produto em estoque
         SELECT quantidade INTO estoque_atual FROM estoque WHERE produto_id = id_produto;
         
-        - -- Se o estoque for suficiente para atender o pedido
+        -- Se o estoque for suficiente para atender o pedido
         IF estoque_atual >= quantidade THEN
             -- Atualiza a tabela entrega com o total do pedido
             INSERT INTO entregas (pedido_id, produto_id, quantidade, total_item)
